@@ -61,7 +61,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     addGestureRecognizer(scopePanGestureRecognizer)
 
     configureVisibility(for: initialScope)
-    scroll(toDayContaining: initialDate, scrollPosition: .centered, animated: false)
+    scrollScopes(toAnchorDate: anchorDate, animated: false)
   }
 
   required init?(coder _: NSCoder) {
@@ -150,7 +150,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     self.content = content
     monthCalendarView.setContent(content, animated: animated)
     weekCalendarView.setContent(content)
-    scroll(toDayContaining: anchorDate, scrollPosition: .centered, animated: false)
+    scrollScopes(toAnchorDate: anchorDate, animated: false)
     invalidateIntrinsicContentSize()
   }
 
@@ -162,7 +162,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   ) {
     anchorDate = clampedDate(date)
     guard scope != self.scope else {
-      scroll(toDayContaining: anchorDate, scrollPosition: .centered, animated: animated)
+      scrollScopes(toAnchorDate: anchorDate, animated: animated)
       return
     }
 
@@ -306,7 +306,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     switch scope {
     case .month:
       monthCalendarView.scroll(
-        toDayContaining: anchorDate,
+        toMonthContaining: anchorDate,
         scrollPosition: .centered,
         animated: false
       )
@@ -321,6 +321,18 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     }
 
     layoutIfNeeded()
+  }
+
+  private func scrollScopes(toAnchorDate anchorDate: Date, animated: Bool) {
+    monthCalendarView.scroll(
+      toMonthContaining: anchorDate,
+      scrollPosition: .centered,
+      animated: animated && scope == .month
+    )
+    weekCalendarView.scroll(
+      toDay: content.calendar.day(containing: anchorDate),
+      animated: animated && scope == .week
+    )
   }
 
   private func configureVisibility(for scope: CalendarViewScope) {
