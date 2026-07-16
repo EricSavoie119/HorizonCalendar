@@ -21,7 +21,7 @@ import UIKit
 /// `CalendarViewContent` providers for its paged week renderer. Custom day views, day backgrounds,
 /// day ranges, layout metrics, calendar systems, and accessibility content therefore carry across
 /// both scopes.
-public final class CalendarScopeView: UIView {
+public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
 
   // MARK: Lifecycle
 
@@ -402,18 +402,15 @@ public final class CalendarScopeView: UIView {
       break
     }
   }
-}
 
-// MARK: UIGestureRecognizerDelegate
-
-extension CalendarScopeView: UIGestureRecognizerDelegate {
-
-  public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+  public override func gestureRecognizerShouldBegin(
+    _ gestureRecognizer: UIGestureRecognizer
+  ) -> Bool {
     guard
       gestureRecognizer === scopePanGestureRecognizer,
       let panGestureRecognizer = gestureRecognizer as? UIPanGestureRecognizer
     else {
-      return true
+      return super.gestureRecognizerShouldBegin(gestureRecognizer)
     }
 
     let velocity = panGestureRecognizer.velocity(in: self)
@@ -426,6 +423,11 @@ extension CalendarScopeView: UIGestureRecognizerDelegate {
       return velocity.y > 0
     }
   }
+}
+
+// MARK: UIGestureRecognizerDelegate
+
+extension CalendarScopeView {
 
   public func gestureRecognizer(
     _: UIGestureRecognizer,
