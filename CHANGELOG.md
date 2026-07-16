@@ -4,9 +4,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/airbnb/HorizonCalendar/compare/v2.0.0...HEAD)
+## [Unreleased](https://github.com/EricSavoie119/HorizonCalendar/compare/v2.0.0...HEAD)
 
 ### Added
+- Added `CalendarScopeView` with first-class `CalendarViewScope.month` and `.week` presentation.
+- Added horizontally paged weeks that remain contiguous across month and year boundaries.
+- Added animated scope transitions anchored to the selected date.
+- Added upward-collapse and downward-expand scope gestures.
+- Added preferred-height callbacks for animating UIKit and SwiftUI calendar containers.
+- Added week-scope support for custom day items, day backgrounds, day range indicators, layout
+  metrics, non-Sunday week starts, and partial visible-date boundaries.
 - Added support for disabling touch handling on SwiftUI views via the `allowsHitTesting` modifier
 - Added SwiftUI documentation to the README.md
 - Added properties to `CalendarViewProxy` for getting the `visibleMonthRange` and `visibleDayRange` 

@@ -103,6 +103,27 @@ extension Calendar {
     return self.day(containing: firstDateOfNextDay)
   }
 
+  func startOfWeek(containing day: Day) -> Day {
+    let date = startDate(of: day)
+    let dayOffset = dayOfWeekPosition(for: date).rawValue - 1
+    return self.day(byAddingDays: -dayOffset, to: day)
+  }
+
+  func numberOfWeeks(from firstWeekStart: Day, through lastWeekStart: Day) -> Int {
+    let firstDate = startDate(of: firstWeekStart)
+    let lastDate = startDate(of: lastWeekStart)
+    guard
+      let numberOfDays = dateComponents([.day], from: firstDate, to: lastDate).day,
+      numberOfDays >= 0
+    else {
+      preconditionFailure(
+        "Could not calculate a nonnegative week count from \(firstWeekStart) through \(lastWeekStart)."
+      )
+    }
+
+    return (numberOfDays / DayOfWeekPosition.numberOfPositions) + 1
+  }
+
 }
 
 // MARK: Day of Week Helpers

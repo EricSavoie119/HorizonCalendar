@@ -1,6 +1,12 @@
 # HorizonCalendar
 A declarative and performant calendar UI component that supports use cases ranging from simple date pickers all the way up to fully-featured calendar apps.
 
+> [!NOTE]
+> This fork adds first-class month and week scopes through `CalendarScopeView`, including
+> selected-date transitions, horizontal week paging, vertical expand/collapse gestures, and
+> preferred-height callbacks. It remains based on and visibly linked to
+> [Airbnb's HorizonCalendar](https://github.com/airbnb/HorizonCalendar).
+
 [![Swift Package Manager compatible](https://img.shields.io/badge/SPM-compatible-4BC51D.svg?style=flat)](https://github.com/apple/swift-package-manager)
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
 [![Version](https://img.shields.io/cocoapods/v/HorizonCalendar.svg)](https://cocoapods.org/pods/HorizonCalendar)
@@ -17,6 +23,9 @@ Features:
 - SwiftUI and UIKit support
 - Vertical and horizontal month layouts
 - Paging for horizontal month layout
+- First-class `.month` and `.week` scopes with animated selected-date transitions
+- Horizontal week paging across month and year boundaries
+- Vertical gestures to collapse into week scope and expand into month scope
 - Right-to-left layout support
 - Declarative API that encourages unidirectional data flow for updating the content of the calendar
 - Supports displaying large (virtually-infinite) date ranges
@@ -64,6 +73,7 @@ Features:
       - [Adjusting layout metrics](#adjusting-layout-metrics)
       - [Adding a day range indicator](#adding-a-day-range-indicator)
       - [Adding grid lines](#adding-grid-lines)
+    - [Switching between month and week scopes](#switching-between-month-and-week-scopes)
     - [Responding to day selection](#responding-to-day-selection)
 - [Testing](#testing)
   - [Accessibility Testing](#accessibility-testing)
@@ -642,6 +652,54 @@ The month background provider works similarly to the overlay provider and day ra
 
 <img width="250" alt="Grid Background Screenshot" src="Docs/Images/tutorial_grid.png">
 
+
+### Switching between month and week scopes
+
+`CalendarScopeView` combines HorizonCalendar's existing month renderer with a horizontally paged
+week renderer. Both scopes use the same `CalendarViewContent`, so custom day views, day
+backgrounds, day range indicators, spacing, aspect ratios, calendars, locales, and accessibility
+content carry across the transition.
+
+```swift
+let scopedCalendar = CalendarScopeView(
+  initialContent: makeContent(),
+  initialScope: .month,
+  initialDate: selectedDate
+)
+
+scopedCalendar.collapsesToWeekOnDaySelection = true
+
+scopedCalendar.daySelectionHandler = { [weak self] day in
+  guard let self, let date = self.calendar.date(from: day.components) else { return }
+  self.selectedDate = date
+  self.scopedCalendar.setContent(self.makeContent(), animated: true)
+}
+
+scopedCalendar.preferredHeightChangeHandler = { [weak self] change in
+  guard let self else { return }
+  self.calendarHeightConstraint.constant = change.height
+
+  guard change.animated else {
+    self.view.layoutIfNeeded()
+    return
+  }
+
+  UIView.animate(withDuration: change.animationDuration) {
+    self.view.layoutIfNeeded()
+  }
+}
+```
+
+Change scopes programmatically while keeping a date anchored:
+
+```swift
+scopedCalendar.setScope(.week, anchoredAt: selectedDate, animated: true)
+scopedCalendar.setScope(.month, anchoredAt: selectedDate, animated: true)
+```
+
+By default, an upward vertical gesture collapses month scope into week scope and a downward
+vertical gesture expands it again. Set `isScopeGestureEnabled` to `false` if the containing
+application provides its own gesture or explicit Month/Week controls.
 
 ### Responding to day selection
 If you're building a date picker, you'll most likely need to respond to the user tapping on days in the calendar.

@@ -103,6 +103,12 @@ public final class CalendarView: UIView {
     visibleItemsDetails?.visibleDayRange
   }
 
+  func frameOfVisibleDay(containing date: Date) -> CGRect? {
+    let day = calendar.day(containing: date)
+    guard let frame = visibleItemsDetails?.framesForVisibleDays[day] else { return nil }
+    return scrollView.convert(frame, to: self)
+  }
+
   /// `CalendarView` only supports positive values for `layoutMargins`. Negative values will be changed to `0`.
   public override var layoutMargins: UIEdgeInsets {
     get { super.layoutMargins }
