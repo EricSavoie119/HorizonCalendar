@@ -144,7 +144,12 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
 
   public override func layoutSubviews() {
     super.layoutSubviews()
-    monthCalendarView.frame = bounds
+    monthCalendarView.frame = CGRect(
+      x: bounds.minX,
+      y: bounds.minY,
+      width: bounds.width,
+      height: transitionMonthHeight ?? bounds.height
+    )
     weekCalendarView.frame = bounds
   }
 
@@ -160,6 +165,9 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     monthCalendarView.setContent(content, animated: animated)
     weekCalendarView.setContent(content)
     scrollScopes(toAnchorDate: anchorDate, animated: false)
+    layoutIfNeeded()
+    monthCalendarView.setAlpha(0, forVisibleDays: transitionHiddenDays)
+    weekCalendarView.setAlpha(0, forVisibleDays: transitionHiddenDays)
     invalidateIntrinsicContentSize()
   }
 
@@ -245,6 +253,9 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   private let monthCalendarView: CalendarView
   private let weekCalendarView: WeekCalendarView
   private weak var enclosingScrollView: UIScrollView?
+  private var transitionMonthHeight: CGFloat?
+  private var transitionHiddenDays = Set<Day>()
+  private var transitionIdentifier = 0
 
   private func claimVerticalGesturesFromEnclosingScrollView() {
     var ancestor = superview
@@ -376,22 +387,43 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     anchorDate: Date,
     duration: TimeInterval
   ) {
-    let selectedDayFrame = monthCalendarView.frameOfVisibleDay(containing: anchorDate)
-    let translation = max((selectedDayFrame?.minY ?? bounds.midY) - bounds.minY, 0)
+    transitionIdentifier += 1
+    let transitionIdentifier = transitionIdentifier
+
+    transitionMonthHeight = preferredHeight(forWidth: bounds.width, scope: .month)
+    setNeedsLayout()
+    layoutIfNeeded()
+    prepareTargetScope(newScope, anchorDate: anchorDate)
+
+    let matchedDays = makeMatchedDayTransitions(
+      from: oldScope,
+      to: newScope,
+      anchorDate: anchorDate
+    )
+    let matchedDaySet = Set(matchedDays.map(\.day))
+
+    monthCalendarView.setAlpha(1, forVisibleDays: transitionHiddenDays)
+    weekCalendarView.setAlpha(1, forVisibleDays: transitionHiddenDays)
+    transitionHiddenDays = matchedDaySet
 
     monthCalendarView.isHidden = false
     weekCalendarView.isHidden = false
+    monthCalendarView.transform = .identity
+    weekCalendarView.transform = .identity
+
+    monthCalendarView.setAlpha(0, forVisibleDays: matchedDaySet)
+    weekCalendarView.setAlpha(0, forVisibleDays: matchedDaySet)
+
+    for matchedDay in matchedDays {
+      addSubview(matchedDay.view)
+    }
 
     if newScope == .week {
-      weekCalendarView.alpha = 0
-      weekCalendarView.transform = CGAffineTransform(translationX: 0, y: translation)
+      weekCalendarView.alpha = 1
       monthCalendarView.alpha = 1
-      monthCalendarView.transform = .identity
     } else {
       monthCalendarView.alpha = 0
-      monthCalendarView.transform = CGAffineTransform(translationX: 0, y: -translation * 0.35)
       weekCalendarView.alpha = 1
-      weekCalendarView.transform = .identity
     }
 
     UIView.animate(
@@ -399,24 +431,71 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       delay: 0,
       options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut]
     ) {
+      for matchedDay in matchedDays {
+        matchedDay.view.frame = matchedDay.endFrame
+      }
+
       if newScope == .week {
-        self.weekCalendarView.alpha = 1
-        self.weekCalendarView.transform = .identity
         self.monthCalendarView.alpha = 0
-        self.monthCalendarView.transform = CGAffineTransform(
-          translationX: 0,
-          y: -translation * 0.2
-        )
       } else {
         self.monthCalendarView.alpha = 1
-        self.monthCalendarView.transform = .identity
         self.weekCalendarView.alpha = 0
-        self.weekCalendarView.transform = CGAffineTransform(translationX: 0, y: translation)
       }
     } completion: { _ in
+      guard transitionIdentifier == self.transitionIdentifier else {
+        for matchedDay in matchedDays {
+          matchedDay.view.removeFromSuperview()
+        }
+        return
+      }
+
+      self.monthCalendarView.setAlpha(1, forVisibleDays: matchedDaySet)
+      self.weekCalendarView.setAlpha(1, forVisibleDays: matchedDaySet)
+      self.transitionHiddenDays.removeAll()
+      for matchedDay in matchedDays {
+        matchedDay.view.removeFromSuperview()
+      }
+
+      self.transitionMonthHeight = nil
       self.configureVisibility(for: newScope)
+      self.setNeedsLayout()
       self.scopeChangeHandler?(newScope)
       self.invalidateIntrinsicContentSize()
+    }
+  }
+
+  private func makeMatchedDayTransitions(
+    from oldScope: CalendarViewScope,
+    to newScope: CalendarViewScope,
+    anchorDate: Date
+  ) -> [MatchedDayTransition] {
+    let anchorDay = content.calendar.day(containing: anchorDate)
+    let weekStart = content.calendar.startOfWeek(containing: anchorDay)
+
+    return (0..<DayOfWeekPosition.numberOfPositions).compactMap { dayOffset in
+      let day = content.calendar.day(byAddingDays: dayOffset, to: weekStart)
+      guard content.dayRange.contains(day) else { return nil }
+
+      let date = content.calendar.startDate(of: day)
+      guard
+        let monthFrame = monthCalendarView.frameOfVisibleDay(containing: date),
+        let weekFrame = weekCalendarView.frameOfVisibleDay(day)
+      else {
+        return nil
+      }
+
+      let startFrame = oldScope == .month ? monthFrame : weekFrame
+      let endFrame = newScope == .month ? monthFrame : weekFrame
+      let view = ItemView(initialCalendarItemModel: content.dayItemProvider(day))
+      view.frame = startFrame
+      view.isUserInteractionEnabled = false
+      view.layoutIfNeeded()
+
+      return MatchedDayTransition(
+        day: day,
+        view: view,
+        endFrame: endFrame
+      )
     }
   }
 
@@ -453,4 +532,10 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     let velocity = panGestureRecognizer.velocity(in: self)
     return abs(velocity.y) > abs(velocity.x)
   }
+}
+
+private struct MatchedDayTransition {
+  let day: Day
+  let view: ItemView
+  let endFrame: CGRect
 }

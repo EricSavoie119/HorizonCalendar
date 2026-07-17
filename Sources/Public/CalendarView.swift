@@ -109,6 +109,19 @@ public final class CalendarView: UIView {
     return scrollView.convert(frame, to: self)
   }
 
+  func setAlpha(_ alpha: CGFloat, forVisibleDays days: Set<Day>) {
+    for (visibleItem, visibleView) in visibleViewsForVisibleItems {
+      guard
+        case .layoutItemType(.day(let day)) = visibleItem.itemType,
+        days.contains(day)
+      else {
+        continue
+      }
+
+      visibleView.alpha = alpha
+    }
+  }
+
   /// `CalendarView` only supports positive values for `layoutMargins`. Negative values will be changed to `0`.
   public override var layoutMargins: UIEdgeInsets {
     get { super.layoutMargins }
