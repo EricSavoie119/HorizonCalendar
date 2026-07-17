@@ -133,6 +133,32 @@ final class WeekCalendarView: UIView {
     return weekData.visibleDayRange(forWeekAt: pageIndex)
   }
 
+  func frameOfVisibleDay(_ day: Day) -> CGRect? {
+    guard
+      let anchorDay,
+      weekData.weekIndex(containing: anchorDay) == weekData.weekIndex(containing: day),
+      content.dayRange.contains(day)
+    else {
+      return nil
+    }
+
+    let metrics = WeekLayoutMetrics(
+      content: content,
+      width: bounds.width,
+      layoutMargins: directionalLayoutMargins
+    )
+    let position = content.calendar.dayOfWeekPosition(
+      for: content.calendar.startDate(of: day)
+    )
+    return metrics.frameForDay(at: position.rawValue - 1)
+  }
+
+  func setAlpha(_ alpha: CGFloat, forVisibleDays days: Set<Day>) {
+    for case let cell as WeekPageCollectionViewCell in collectionView.visibleCells {
+      cell.setAlpha(alpha, forDays: days)
+    }
+  }
+
   // MARK: Private
 
   private var content: CalendarViewContent
@@ -280,6 +306,10 @@ private final class WeekPageCollectionViewCell: UICollectionViewCell {
     pageView.configure(days: days, content: content, selectionHandler: selectionHandler)
   }
 
+  func setAlpha(_ alpha: CGFloat, forDays days: Set<Day>) {
+    pageView.setAlpha(alpha, forDays: days)
+  }
+
   private let pageView = WeekPageView()
 }
 
@@ -338,6 +368,13 @@ private final class WeekPageView: UIView {
     dayBackgroundViews.removeAll(keepingCapacity: true)
     dayRangeViews.removeAll(keepingCapacity: true)
     dayViews.removeAll(keepingCapacity: true)
+  }
+
+  func setAlpha(_ alpha: CGFloat, forDays matchingDays: Set<Day>) {
+    for (day, dayView) in zip(days, dayViews) {
+      guard let day, matchingDays.contains(day) else { continue }
+      dayView?.alpha = alpha
+    }
   }
 
   override func layoutSubviews() {
@@ -522,6 +559,16 @@ private struct WeekLayoutMetrics {
       y: rowOriginY,
       width: dayWidth,
       height: dayOfWeekHeight
+    )
+  }
+
+  func frameForDay(at index: Int) -> CGRect {
+    CGRect(
+      x: layoutMargins.leading + content.monthDayInsets.leading
+        + (CGFloat(index) * (dayWidth + content.horizontalDayMargin)),
+      y: collectionViewFrame.minY,
+      width: dayWidth,
+      height: dayHeight
     )
   }
 }
