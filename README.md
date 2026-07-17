@@ -698,8 +698,9 @@ scopedCalendar.setScope(.month, anchoredAt: selectedDate, animated: true)
 ```
 
 By default, an upward vertical gesture collapses month scope into week scope and a downward
-vertical gesture expands it again. Set `isScopeGestureEnabled` to `false` if the containing
-application provides its own gesture or explicit Month/Week controls.
+vertical gesture expands it again. Vertical gestures that begin inside the calendar take
+precedence over an enclosing scroll view, including pull-to-refresh. Set `isScopeGestureEnabled`
+to `false` if the containing application provides its own gesture or explicit Month/Week controls.
 
 ### Responding to day selection
 If you're building a date picker, you'll most likely need to respond to the user tapping on days in the calendar.

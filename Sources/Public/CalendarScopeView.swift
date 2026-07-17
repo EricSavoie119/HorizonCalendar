@@ -100,6 +100,9 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   public var preferredHeightChangeHandler: ((CalendarViewScopeHeightChange) -> Void)?
 
   /// Enables an upward gesture to collapse to a week and a downward gesture to expand to a month.
+  ///
+  /// When enabled, vertical gestures that begin inside the calendar take precedence over an
+  /// enclosing scroll view, preventing pull-to-refresh and vertical scrolling from stealing them.
   public var isScopeGestureEnabled = true {
     didSet {
       scopePanGestureRecognizer.isEnabled = isScopeGestureEnabled
@@ -143,6 +146,12 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     super.layoutSubviews()
     monthCalendarView.frame = bounds
     weekCalendarView.frame = bounds
+  }
+
+  public override func didMoveToWindow() {
+    super.didMoveToWindow()
+    guard window != nil else { return }
+    claimVerticalGesturesFromEnclosingScrollView()
   }
 
   /// Updates the content in both month and week scopes.
@@ -235,6 +244,22 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   private var anchorDate: Date
   private let monthCalendarView: CalendarView
   private let weekCalendarView: WeekCalendarView
+  private weak var enclosingScrollView: UIScrollView?
+
+  private func claimVerticalGesturesFromEnclosingScrollView() {
+    var ancestor = superview
+
+    while let currentAncestor = ancestor {
+      if let scrollView = currentAncestor as? UIScrollView {
+        guard enclosingScrollView !== scrollView else { return }
+        scrollView.panGestureRecognizer.require(toFail: scopePanGestureRecognizer)
+        enclosingScrollView = scrollView
+        return
+      }
+
+      ancestor = currentAncestor.superview
+    }
+  }
 
   private func installScrollHandlers() {
     monthCalendarView.didScroll = { [weak self] range, isUserDragging in
@@ -426,25 +451,6 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     }
 
     let velocity = panGestureRecognizer.velocity(in: self)
-    guard abs(velocity.y) > abs(velocity.x) else { return false }
-
-    switch scope {
-    case .month:
-      return velocity.y < 0
-    case .week:
-      return velocity.y > 0
-    }
-  }
-}
-
-// MARK: UIGestureRecognizerDelegate
-
-extension CalendarScopeView {
-
-  public func gestureRecognizer(
-    _: UIGestureRecognizer,
-    shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
-  ) -> Bool {
-    true
+    return abs(velocity.y) > abs(velocity.x)
   }
 }
