@@ -69,6 +69,8 @@ public struct CalendarViewScopeTransitionDebugSnapshot {
   public let weekPresentationFrame: CGRect
   public let monthMaskFrame: CGRect?
   public let monthMaskPresentationFrame: CGRect?
+  public let transitionBackdropFrame: CGRect?
+  public let transitionBackdropPresentationFrame: CGRect?
   public let matchedRowFrame: CGRect?
   public let matchedRowPresentationFrame: CGRect?
   public let monthAnchorFrame: CGRect
