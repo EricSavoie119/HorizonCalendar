@@ -107,6 +107,33 @@ final class WeekDataTests: XCTestCase {
     )
   }
 
+  func testHorizontalWeekLayoutMatchesCenteredMonthPageGeometry() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+    let content = CalendarViewContent(
+      calendar: calendar,
+      visibleDateRange: date(
+        2026, 1, 1, calendar: calendar)...date(2026, 12, 31, calendar: calendar),
+      monthsLayout: .horizontal
+    )
+    .interMonthSpacing(18)
+    .horizontalDayMargin(4)
+
+    let metrics = WeekLayoutMetrics(
+      content: content,
+      width: 408,
+      layoutMargins: .zero
+    )
+
+    XCTAssertEqual(metrics.monthFrame.minX, 9, accuracy: 0.001)
+    XCTAssertEqual(metrics.monthFrame.width, 390, accuracy: 0.001)
+    XCTAssertEqual(metrics.collectionViewFrame.minX, 9, accuracy: 0.001)
+    XCTAssertEqual(metrics.collectionViewFrame.width, 390, accuracy: 0.001)
+    XCTAssertEqual(metrics.dayWidth, 52.285_714, accuracy: 0.001)
+    XCTAssertEqual(metrics.frameForDay(at: 5).minX, 290.428_571, accuracy: 0.001)
+  }
+
   private func date(
     _ year: Int,
     _ month: Int,
