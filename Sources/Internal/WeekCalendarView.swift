@@ -153,10 +153,8 @@ final class WeekCalendarView: UIView {
     return metrics.frameForDay(at: position.rawValue - 1)
   }
 
-  func setAlpha(_ alpha: CGFloat, forVisibleDays days: Set<Day>) {
-    for case let cell as WeekPageCollectionViewCell in collectionView.visibleCells {
-      cell.setAlpha(alpha, forDays: days)
-    }
+  func setDayContentAlpha(_ alpha: CGFloat) {
+    collectionView.alpha = alpha
   }
 
   // MARK: Private
@@ -306,10 +304,6 @@ private final class WeekPageCollectionViewCell: UICollectionViewCell {
     pageView.configure(days: days, content: content, selectionHandler: selectionHandler)
   }
 
-  func setAlpha(_ alpha: CGFloat, forDays days: Set<Day>) {
-    pageView.setAlpha(alpha, forDays: days)
-  }
-
   private let pageView = WeekPageView()
 }
 
@@ -368,13 +362,6 @@ private final class WeekPageView: UIView {
     dayBackgroundViews.removeAll(keepingCapacity: true)
     dayRangeViews.removeAll(keepingCapacity: true)
     dayViews.removeAll(keepingCapacity: true)
-  }
-
-  func setAlpha(_ alpha: CGFloat, forDays matchingDays: Set<Day>) {
-    for (day, dayView) in zip(days, dayViews) {
-      guard let day, matchingDays.contains(day) else { continue }
-      dayView?.alpha = alpha
-    }
   }
 
   override func layoutSubviews() {
