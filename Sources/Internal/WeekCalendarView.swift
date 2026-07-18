@@ -484,7 +484,7 @@ struct WeekData {
 
 // MARK: - Layout metrics
 
-private struct WeekLayoutMetrics {
+struct WeekLayoutMetrics {
 
   init(
     content: CalendarViewContent,
@@ -495,15 +495,32 @@ private struct WeekLayoutMetrics {
     self.width = width
     self.layoutMargins = layoutMargins
 
+    let monthWidth: CGFloat
+    let monthOriginX: CGFloat
+    switch content.monthsLayout {
+    case .vertical:
+      monthWidth = width - layoutMargins.leading - layoutMargins.trailing
+      monthOriginX = layoutMargins.leading
+    case .horizontal(let options):
+      monthWidth = options.monthWidth(
+        calendarWidth: width,
+        interMonthSpacing: content.interMonthSpacing
+      )
+      monthOriginX = (width - monthWidth) / 2
+    }
+
+    monthFrame = CGRect(x: monthOriginX, y: 0, width: monthWidth, height: 0)
+
     let availableWidth =
-      width - layoutMargins.leading - layoutMargins.trailing - content.monthDayInsets.leading
-      - content.monthDayInsets.trailing - (content.horizontalDayMargin * 6)
+      monthWidth - content.monthDayInsets.leading - content.monthDayInsets.trailing
+      - (content.horizontalDayMargin * 6)
     dayWidth = max(availableWidth / 7, 0)
   }
 
   let content: CalendarViewContent
   let width: CGFloat
   let layoutMargins: NSDirectionalEdgeInsets
+  let monthFrame: CGRect
   let dayWidth: CGFloat
 
   var dayOfWeekHeight: CGFloat {
@@ -520,11 +537,10 @@ private struct WeekLayoutMetrics {
 
   var collectionViewFrame: CGRect {
     CGRect(
-      x: layoutMargins.leading + content.monthDayInsets.leading,
+      x: monthFrame.minX + content.monthDayInsets.leading,
       y: dayOfWeekOriginY + dayOfWeekHeight + content.verticalDayMargin,
       width: max(
-        width - layoutMargins.leading - layoutMargins.trailing - content.monthDayInsets.leading
-          - content.monthDayInsets.trailing,
+        monthFrame.width - content.monthDayInsets.leading - content.monthDayInsets.trailing,
         0
       ),
       height: dayHeight
@@ -547,7 +563,7 @@ private struct WeekLayoutMetrics {
 
   func frameForDay(at index: Int, rowOriginY: CGFloat) -> CGRect {
     CGRect(
-      x: layoutMargins.leading + content.monthDayInsets.leading
+      x: monthFrame.minX + content.monthDayInsets.leading
         + (CGFloat(index) * (dayWidth + content.horizontalDayMargin)),
       y: rowOriginY,
       width: dayWidth,
@@ -557,7 +573,7 @@ private struct WeekLayoutMetrics {
 
   func frameForDay(at index: Int) -> CGRect {
     CGRect(
-      x: layoutMargins.leading + content.monthDayInsets.leading
+      x: monthFrame.minX + content.monthDayInsets.leading
         + (CGFloat(index) * (dayWidth + content.horizontalDayMargin)),
       y: collectionViewFrame.minY,
       width: dayWidth,
