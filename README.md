@@ -3,7 +3,7 @@ A declarative and performant calendar UI component that supports use cases rangi
 
 > [!NOTE]
 > This fork adds first-class month and week scopes through `CalendarScopeView`, including
-> selected-date transitions, horizontal week paging, vertical expand/collapse gestures, and
+> matched-row selected-date transitions, horizontal week paging, vertical expand/collapse gestures, and
 > preferred-height callbacks. It remains based on and visibly linked to
 > [Airbnb's HorizonCalendar](https://github.com/airbnb/HorizonCalendar).
 
@@ -23,7 +23,7 @@ Features:
 - SwiftUI and UIKit support
 - Vertical and horizontal month layouts
 - Paging for horizontal month layout
-- First-class `.month` and `.week` scopes with animated selected-date transitions
+- First-class `.month` and `.week` scopes with matched-row selected-date transitions
 - Horizontal week paging across month and year boundaries
 - Vertical gestures to collapse into week scope and expand into month scope
 - Right-to-left layout support
@@ -702,9 +702,10 @@ vertical gesture expands it again. Vertical gestures that begin inside the calen
 precedence over an enclosing scroll view, including pull-to-refresh. Set `isScopeGestureEnabled`
 to `false` if the containing application provides its own gesture or explicit Month/Week controls.
 
-Animated scope changes keep the weekday header stationary and move the actual anchored month row
-into its week position. The surrounding rows are clipped by an animated mask; neither calendar
-renderer changes opacity during the transition.
+Animated scope changes keep the weekday header stationary and move one rasterized copy of the
+anchored row between its exact month and week frames. That row resizes continuously when the two
+layouts use slightly different day heights. The surrounding rows are clipped by an animated mask;
+neither calendar renderer changes opacity during the transition.
 
 ### Responding to day selection
 If you're building a date picker, you'll most likely need to respond to the user tapping on days in the calendar.

@@ -455,10 +455,16 @@ struct WeekData {
 
   func weekIndex(containing day: Day) -> Int {
     let weekStart = calendar.startOfWeek(containing: day)
-    return min(
-      max(calendar.numberOfWeeks(from: firstWeekStart, through: weekStart) - 1, 0),
-      max(weekCount - 1, 0)
+    let lastIndex = max(weekCount - 1, 0)
+    guard weekStart > firstWeekStart else { return 0 }
+
+    let lastWeekStart = calendar.day(
+      byAddingDays: lastIndex * DayOfWeekPosition.numberOfPositions,
+      to: firstWeekStart
     )
+    guard weekStart < lastWeekStart else { return lastIndex }
+
+    return calendar.numberOfWeeks(from: firstWeekStart, through: weekStart) - 1
   }
 
   func days(inWeekAt index: Int) -> [Day?] {

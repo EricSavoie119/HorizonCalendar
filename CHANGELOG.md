@@ -20,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ability to disable `DisplayLink` animations for test purposes (to prevent crashes) with an environment variable.
 
 ### Fixed
-- Removed scope cross-fades so the actual month row translates and clips into week scope while
-  the weekday header remains fixed.
+- Replaced scope cross-fades and renderer swaps with an exact matched-row transition that moves and
+  resizes continuously between month and week geometry while the weekday header remains fixed.
+- Fixed week-index clamping crashing for dates outside the configured visible range.
+- Added the scope implementation and week tests to the Xcode project targets.
 - Fixed enclosing scroll views and pull-to-refresh controls stealing vertical calendar gestures.
 - Fixed an issue that could cause accessibility focus to shift unexpectedly
 - Fixed a screen-pixel alignment issue

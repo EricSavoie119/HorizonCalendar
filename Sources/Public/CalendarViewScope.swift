@@ -41,3 +41,38 @@ public struct CalendarViewScopeHeightChange {
   /// Whether the height change should be animated.
   public let animated: Bool
 }
+
+/// Per-frame geometry emitted while a calendar scope transition is running.
+///
+/// This API is intended for animation diagnostics and automated visual labs.
+@_spi(Instrumentation)
+public struct CalendarViewScopeTransitionDebugSnapshot {
+
+  public enum Phase: String {
+    case started
+    case running
+    case completed
+  }
+
+  public let phase: Phase
+  public let fromScope: CalendarViewScope
+  public let toScope: CalendarViewScope
+  public let elapsedTime: TimeInterval
+  public let duration: TimeInterval
+  public let containerBounds: CGRect
+  public let containerPresentationFrame: CGRect
+  public let monthFrame: CGRect
+  public let monthPresentationFrame: CGRect
+  public let monthTransform: CGAffineTransform
+  public let monthPresentationTransform: CGAffineTransform
+  public let weekFrame: CGRect
+  public let weekPresentationFrame: CGRect
+  public let monthMaskFrame: CGRect?
+  public let monthMaskPresentationFrame: CGRect?
+  public let matchedRowFrame: CGRect?
+  public let matchedRowPresentationFrame: CGRect?
+  public let monthAnchorFrame: CGRect
+  public let weekAnchorFrame: CGRect
+  public let monthAnchorPresentationCenter: CGPoint
+  public let weekAnchorPresentationCenter: CGPoint
+}
