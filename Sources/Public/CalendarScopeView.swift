@@ -99,6 +99,11 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   /// Called before a scope transition when the calendar's container should change height.
   public var preferredHeightChangeHandler: ((CalendarViewScopeHeightChange) -> Void)?
 
+  /// Receives per-frame geometry while an animated scope transition runs.
+  @_spi(Instrumentation)
+  public var scopeTransitionDebugHandler:
+    ((CalendarViewScopeTransitionDebugSnapshot) -> Void)?
+
   /// Enables an upward gesture to collapse to a week and a downward gesture to expand to a month.
   ///
   /// When enabled, vertical gestures that begin inside the calendar take precedence over an
@@ -251,6 +256,10 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   private let weekCalendarView: WeekCalendarView
   private weak var enclosingScrollView: UIScrollView?
   private var transitionMonthHeight: CGFloat?
+  private var transitionDebugContext: TransitionDebugContext?
+  private var transitionDebugDisplayLink: CADisplayLink?
+  private weak var transitionDebugMaskView: UIView?
+  private weak var transitionDebugMatchedRowView: UIView?
 
   private func claimVerticalGesturesFromEnclosingScrollView() {
     var ancestor = superview
@@ -400,44 +409,87 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       return
     }
 
-    let monthToWeekTranslation = weekDayFrame.minY - monthDayFrame.minY
-    let rowMaskFrame = CGRect(
+    let monthRowFrame = CGRect(
       x: monthCalendarView.bounds.minX,
       y: monthDayFrame.minY,
       width: monthCalendarView.bounds.width,
       height: monthDayFrame.height
     )
-    let fullMonthMaskFrame = monthCalendarView.bounds
-    let maskView = UIView(
-      frame: oldScope == .month ? fullMonthMaskFrame : rowMaskFrame
+    let weekRowFrame = CGRect(
+      x: weekCalendarView.bounds.minX,
+      y: weekDayFrame.minY,
+      width: weekCalendarView.bounds.width,
+      height: weekDayFrame.height
     )
-    maskView.backgroundColor = .black
-    monthCalendarView.mask = maskView
+    let fullMonthMaskFrame = monthCalendarView.bounds
 
     monthCalendarView.isHidden = false
     weekCalendarView.isHidden = false
     monthCalendarView.alpha = 1
     weekCalendarView.alpha = 1
-    monthCalendarView.transform =
-      oldScope == .month
-      ? .identity
-      : CGAffineTransform(translationX: 0, y: monthToWeekTranslation)
+    monthCalendarView.transform = .identity
     weekCalendarView.transform = .identity
+
+    // Keep the shared weekday labels stationary in the live week renderer. The month backdrop is
+    // captured without them, so they never cross-fade or spring between two copies.
     monthCalendarView.setDayOfWeekItemsAlpha(0)
+    weekCalendarView.setDayContentAlpha(1)
+
+    guard
+      let backdropImage = monthCalendarView.snapshotImage(excluding: monthRowFrame),
+      let matchedRowImage = (oldScope == .month
+        ? monthCalendarView.snapshotImage(in: monthRowFrame)
+        : weekCalendarView.snapshotImage(in: weekRowFrame))
+    else {
+      monthCalendarView.setDayOfWeekItemsAlpha(1)
+      transitionMonthHeight = nil
+      configureVisibility(for: newScope)
+      scopeChangeHandler?(newScope)
+      invalidateIntrinsicContentSize()
+      return
+    }
+
+    let backdropView = UIImageView(image: backdropImage)
+    backdropView.frame = monthCalendarView.frame
+    backdropView.contentMode = .scaleToFill
+    backdropView.isUserInteractionEnabled = false
+
+    let maskView = UIView(frame: oldScope == .month ? fullMonthMaskFrame : monthRowFrame)
+    maskView.backgroundColor = .black
+    backdropView.mask = maskView
+
+    let matchedRowView = UIImageView(image: matchedRowImage)
+    matchedRowView.frame = oldScope == .month ? monthRowFrame : weekRowFrame
+    matchedRowView.contentMode = .scaleToFill
+    matchedRowView.isUserInteractionEnabled = false
+
+    monthCalendarView.isHidden = true
     weekCalendarView.setDayContentAlpha(0)
+    addSubview(backdropView)
+    addSubview(matchedRowView)
+    transitionDebugMaskView = maskView
+    transitionDebugMatchedRowView = matchedRowView
+    beginTransitionDebugging(
+      from: oldScope,
+      to: newScope,
+      duration: duration,
+      monthAnchorFrame: monthDayFrame,
+      weekAnchorFrame: weekDayFrame
+    )
 
     UIView.animate(
       withDuration: duration,
       delay: 0,
       options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut]
     ) {
-      self.monthCalendarView.transform =
-        newScope == .month
-        ? .identity
-        : CGAffineTransform(translationX: 0, y: monthToWeekTranslation)
-      maskView.frame = newScope == .month ? fullMonthMaskFrame : rowMaskFrame
+      maskView.frame = newScope == .month ? fullMonthMaskFrame : monthRowFrame
+      matchedRowView.frame = newScope == .month ? monthRowFrame : weekRowFrame
     } completion: { _ in
-      self.monthCalendarView.mask = nil
+      self.finishTransitionDebugging()
+      backdropView.removeFromSuperview()
+      matchedRowView.removeFromSuperview()
+      self.transitionDebugMaskView = nil
+      self.transitionDebugMatchedRowView = nil
       self.monthCalendarView.setDayOfWeekItemsAlpha(1)
       self.weekCalendarView.setDayContentAlpha(1)
       self.transitionMonthHeight = nil
@@ -446,6 +498,104 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       self.scopeChangeHandler?(newScope)
       self.invalidateIntrinsicContentSize()
     }
+  }
+
+  private func beginTransitionDebugging(
+    from oldScope: CalendarViewScope,
+    to newScope: CalendarViewScope,
+    duration: TimeInterval,
+    monthAnchorFrame: CGRect,
+    weekAnchorFrame: CGRect
+  ) {
+    guard scopeTransitionDebugHandler != nil else { return }
+
+    transitionDebugDisplayLink?.invalidate()
+    transitionDebugContext = TransitionDebugContext(
+      fromScope: oldScope,
+      toScope: newScope,
+      startTime: CACurrentMediaTime(),
+      duration: duration,
+      monthAnchorFrame: monthAnchorFrame,
+      weekAnchorFrame: weekAnchorFrame
+    )
+    emitTransitionDebugSnapshot(phase: .started)
+
+    let displayLink = CADisplayLink(target: self, selector: #selector(debugDisplayLinkFired))
+    displayLink.add(to: .main, forMode: .common)
+    transitionDebugDisplayLink = displayLink
+  }
+
+  private func finishTransitionDebugging() {
+    guard transitionDebugContext != nil else { return }
+    emitTransitionDebugSnapshot(phase: .completed)
+    transitionDebugDisplayLink?.invalidate()
+    transitionDebugDisplayLink = nil
+    transitionDebugContext = nil
+  }
+
+  @objc
+  private func debugDisplayLinkFired() {
+    emitTransitionDebugSnapshot(phase: .running)
+  }
+
+  private func emitTransitionDebugSnapshot(
+    phase: CalendarViewScopeTransitionDebugSnapshot.Phase
+  ) {
+    guard
+      let transitionDebugContext,
+      let scopeTransitionDebugHandler
+    else {
+      return
+    }
+
+    let containerPresentationLayer = layer.presentation() ?? layer
+    let monthPresentationLayer = monthCalendarView.layer.presentation() ?? monthCalendarView.layer
+    let weekPresentationLayer = weekCalendarView.layer.presentation() ?? weekCalendarView.layer
+    let maskLayer = transitionDebugMaskView?.layer
+    let maskPresentationLayer = maskLayer?.presentation() ?? maskLayer
+    let matchedRowLayer = transitionDebugMatchedRowView?.layer
+    let matchedRowPresentationLayer = matchedRowLayer?.presentation() ?? matchedRowLayer
+
+    let monthAnchorCenter = CGPoint(
+      x: transitionDebugContext.monthAnchorFrame.midX,
+      y: transitionDebugContext.monthAnchorFrame.midY
+    )
+    let weekAnchorCenter = CGPoint(
+      x: transitionDebugContext.weekAnchorFrame.midX,
+      y: transitionDebugContext.weekAnchorFrame.midY
+    )
+    let monthPresentationFrame = monthPresentationLayer.frame
+    let weekPresentationFrame = weekPresentationLayer.frame
+
+    scopeTransitionDebugHandler(
+      CalendarViewScopeTransitionDebugSnapshot(
+        phase: phase,
+        fromScope: transitionDebugContext.fromScope,
+        toScope: transitionDebugContext.toScope,
+        elapsedTime: CACurrentMediaTime() - transitionDebugContext.startTime,
+        duration: transitionDebugContext.duration,
+        containerBounds: bounds,
+        containerPresentationFrame: containerPresentationLayer.frame,
+        monthFrame: monthCalendarView.frame,
+        monthPresentationFrame: monthPresentationFrame,
+        monthTransform: monthCalendarView.transform,
+        monthPresentationTransform: monthPresentationLayer.affineTransform(),
+        weekFrame: weekCalendarView.frame,
+        weekPresentationFrame: weekPresentationFrame,
+        monthMaskFrame: maskLayer?.frame,
+        monthMaskPresentationFrame: maskPresentationLayer?.frame,
+        matchedRowFrame: transitionDebugMatchedRowView?.frame,
+        matchedRowPresentationFrame: matchedRowPresentationLayer?.frame,
+        monthAnchorFrame: transitionDebugContext.monthAnchorFrame,
+        weekAnchorFrame: transitionDebugContext.weekAnchorFrame,
+        monthAnchorPresentationCenter: monthAnchorCenter.applying(
+          monthPresentationLayer.affineTransform()
+        ),
+        weekAnchorPresentationCenter: weekAnchorCenter.applying(
+          weekPresentationLayer.affineTransform()
+        )
+      )
+    )
   }
 
   @objc
@@ -480,5 +630,41 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
 
     let velocity = panGestureRecognizer.velocity(in: self)
     return abs(velocity.y) > abs(velocity.x)
+  }
+}
+
+private struct TransitionDebugContext {
+  let fromScope: CalendarViewScope
+  let toScope: CalendarViewScope
+  let startTime: CFTimeInterval
+  let duration: TimeInterval
+  let monthAnchorFrame: CGRect
+  let weekAnchorFrame: CGRect
+}
+
+private extension UIView {
+
+  func snapshotImage(in rect: CGRect) -> UIImage? {
+    guard rect.width > 0, rect.height > 0 else { return nil }
+
+    let format = UIGraphicsImageRendererFormat.default()
+    format.scale = window?.screen.scale ?? traitCollection.displayScale
+    format.opaque = false
+    return UIGraphicsImageRenderer(size: rect.size, format: format).image { context in
+      context.cgContext.translateBy(x: -rect.minX, y: -rect.minY)
+      layer.render(in: context.cgContext)
+    }
+  }
+
+  func snapshotImage(excluding rect: CGRect) -> UIImage? {
+    guard bounds.width > 0, bounds.height > 0 else { return nil }
+
+    let format = UIGraphicsImageRendererFormat.default()
+    format.scale = window?.screen.scale ?? traitCollection.displayScale
+    format.opaque = false
+    return UIGraphicsImageRenderer(bounds: bounds, format: format).image { context in
+      layer.render(in: context.cgContext)
+      context.cgContext.clear(rect)
+    }
   }
 }
