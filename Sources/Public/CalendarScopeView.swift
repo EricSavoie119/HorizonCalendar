@@ -156,6 +156,12 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       height: transitionMonthHeight ?? bounds.height
     )
     weekCalendarView.frame = bounds
+
+    if let transitionClipView {
+      transitionClipView.frame = transitionClipFrame(
+        top: transitionClipView.frame.minY
+      )
+    }
   }
 
   public override func didMoveToWindow() {
@@ -258,7 +264,8 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   private var transitionMonthHeight: CGFloat?
   private var transitionDebugContext: TransitionDebugContext?
   private var transitionDebugDisplayLink: CADisplayLink?
-  private weak var transitionDebugMaskView: UIView?
+  private weak var transitionClipView: UIView?
+  private weak var transitionDebugBackdropView: UIView?
   private weak var transitionDebugMatchedRowView: UIView?
 
   private func claimVerticalGesturesFromEnclosingScrollView() {
@@ -421,8 +428,6 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       width: weekCalendarView.bounds.width,
       height: weekDayFrame.height
     )
-    let fullMonthMaskFrame = monthCalendarView.bounds
-
     monthCalendarView.isHidden = false
     weekCalendarView.isHidden = false
     monthCalendarView.alpha = 1
@@ -449,25 +454,54 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       return
     }
 
+    let clipFrame = transitionClipFrame(top: weekRowFrame.minY)
+    let clipView = UIView(frame: clipFrame)
+    clipView.clipsToBounds = true
+    clipView.isUserInteractionEnabled = false
+    clipView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+    let monthBackdropFrame = monthCalendarView.frame.offsetBy(
+      dx: -clipFrame.minX,
+      dy: -clipFrame.minY
+    )
+    let rowScaleX = weekRowFrame.width / monthRowFrame.width
+    let rowScaleY = weekRowFrame.height / monthRowFrame.height
+    let collapsedBackdropFrameInCalendar = CGRect(
+      x: weekRowFrame.minX - ((monthRowFrame.minX - monthCalendarView.bounds.minX) * rowScaleX),
+      y: weekRowFrame.minY - ((monthRowFrame.minY - monthCalendarView.bounds.minY) * rowScaleY),
+      width: monthCalendarView.bounds.width * rowScaleX,
+      height: monthCalendarView.bounds.height * rowScaleY
+    )
+    let weekBackdropFrame = collapsedBackdropFrameInCalendar.offsetBy(
+      dx: -clipFrame.minX,
+      dy: -clipFrame.minY
+    )
+
     let backdropView = UIImageView(image: backdropImage)
-    backdropView.frame = monthCalendarView.frame
+    backdropView.frame = oldScope == .month ? monthBackdropFrame : weekBackdropFrame
     backdropView.contentMode = .scaleToFill
     backdropView.isUserInteractionEnabled = false
 
-    let maskView = UIView(frame: oldScope == .month ? fullMonthMaskFrame : monthRowFrame)
-    maskView.backgroundColor = .black
-    backdropView.mask = maskView
-
     let matchedRowView = UIImageView(image: matchedRowImage)
-    matchedRowView.frame = oldScope == .month ? monthRowFrame : weekRowFrame
+    let monthMatchedRowFrame = monthRowFrame.offsetBy(
+      dx: -clipFrame.minX,
+      dy: -clipFrame.minY
+    )
+    let weekMatchedRowFrame = weekRowFrame.offsetBy(
+      dx: -clipFrame.minX,
+      dy: -clipFrame.minY
+    )
+    matchedRowView.frame = oldScope == .month ? monthMatchedRowFrame : weekMatchedRowFrame
     matchedRowView.contentMode = .scaleToFill
     matchedRowView.isUserInteractionEnabled = false
 
     monthCalendarView.isHidden = true
     weekCalendarView.setDayContentAlpha(0)
-    addSubview(backdropView)
-    addSubview(matchedRowView)
-    transitionDebugMaskView = maskView
+    clipView.addSubview(backdropView)
+    clipView.addSubview(matchedRowView)
+    addSubview(clipView)
+    transitionClipView = clipView
+    transitionDebugBackdropView = backdropView
     transitionDebugMatchedRowView = matchedRowView
     beginTransitionDebugging(
       from: oldScope,
@@ -482,13 +516,13 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       delay: 0,
       options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut]
     ) {
-      maskView.frame = newScope == .month ? fullMonthMaskFrame : monthRowFrame
-      matchedRowView.frame = newScope == .month ? monthRowFrame : weekRowFrame
+      backdropView.frame = newScope == .month ? monthBackdropFrame : weekBackdropFrame
+      matchedRowView.frame = newScope == .month ? monthMatchedRowFrame : weekMatchedRowFrame
     } completion: { _ in
       self.finishTransitionDebugging()
-      backdropView.removeFromSuperview()
-      matchedRowView.removeFromSuperview()
-      self.transitionDebugMaskView = nil
+      clipView.removeFromSuperview()
+      self.transitionClipView = nil
+      self.transitionDebugBackdropView = nil
       self.transitionDebugMatchedRowView = nil
       self.monthCalendarView.setDayOfWeekItemsAlpha(1)
       self.weekCalendarView.setDayContentAlpha(1)
@@ -498,6 +532,16 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       self.scopeChangeHandler?(newScope)
       self.invalidateIntrinsicContentSize()
     }
+    startTransitionDebugDisplayLink()
+  }
+
+  private func transitionClipFrame(top: CGFloat) -> CGRect {
+    CGRect(
+      x: bounds.minX,
+      y: top,
+      width: bounds.width,
+      height: max(bounds.maxY - top, 0)
+    )
   }
 
   private func beginTransitionDebugging(
@@ -519,6 +563,10 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       weekAnchorFrame: weekAnchorFrame
     )
     emitTransitionDebugSnapshot(phase: .started)
+  }
+
+  private func startTransitionDebugDisplayLink() {
+    guard transitionDebugContext != nil, scopeTransitionDebugHandler != nil else { return }
 
     let displayLink = CADisplayLink(target: self, selector: #selector(debugDisplayLinkFired))
     displayLink.add(to: .main, forMode: .common)
@@ -551,10 +599,30 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     let containerPresentationLayer = layer.presentation() ?? layer
     let monthPresentationLayer = monthCalendarView.layer.presentation() ?? monthCalendarView.layer
     let weekPresentationLayer = weekCalendarView.layer.presentation() ?? weekCalendarView.layer
-    let maskLayer = transitionDebugMaskView?.layer
+    let maskLayer = transitionClipView?.layer
     let maskPresentationLayer = maskLayer?.presentation() ?? maskLayer
+    let backdropLayer = transitionDebugBackdropView?.layer
+    let backdropPresentationLayer = backdropLayer?.presentation() ?? backdropLayer
     let matchedRowLayer = transitionDebugMatchedRowView?.layer
     let matchedRowPresentationLayer = matchedRowLayer?.presentation() ?? matchedRowLayer
+    let clipModelOrigin = transitionClipView?.frame.origin ?? .zero
+    let clipPresentationOrigin = maskPresentationLayer?.frame.origin ?? clipModelOrigin
+    let backdropFrame = transitionDebugBackdropView?.frame.offsetBy(
+      dx: clipModelOrigin.x,
+      dy: clipModelOrigin.y
+    )
+    let backdropPresentationFrame = backdropPresentationLayer?.frame.offsetBy(
+      dx: clipPresentationOrigin.x,
+      dy: clipPresentationOrigin.y
+    )
+    let matchedRowFrame = transitionDebugMatchedRowView?.frame.offsetBy(
+      dx: clipModelOrigin.x,
+      dy: clipModelOrigin.y
+    )
+    let matchedRowPresentationFrame = matchedRowPresentationLayer?.frame.offsetBy(
+      dx: clipPresentationOrigin.x,
+      dy: clipPresentationOrigin.y
+    )
 
     let monthAnchorCenter = CGPoint(
       x: transitionDebugContext.monthAnchorFrame.midX,
@@ -584,8 +652,10 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
         weekPresentationFrame: weekPresentationFrame,
         monthMaskFrame: maskLayer?.frame,
         monthMaskPresentationFrame: maskPresentationLayer?.frame,
-        matchedRowFrame: transitionDebugMatchedRowView?.frame,
-        matchedRowPresentationFrame: matchedRowPresentationLayer?.frame,
+        transitionBackdropFrame: backdropFrame,
+        transitionBackdropPresentationFrame: backdropPresentationFrame,
+        matchedRowFrame: matchedRowFrame,
+        matchedRowPresentationFrame: matchedRowPresentationFrame,
         monthAnchorFrame: transitionDebugContext.monthAnchorFrame,
         weekAnchorFrame: transitionDebugContext.weekAnchorFrame,
         monthAnchorPresentationCenter: monthAnchorCenter.applying(

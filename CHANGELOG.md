@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Replaced scope cross-fades and renderer swaps with an exact matched-row transition that moves and
   resizes continuously between month and week geometry while the weekday header remains fixed.
+- Fixed surrounding month rows overlapping the selected row during scope transitions by moving the
+  rasterized month rows as one rigid, clipped stack.
 - Fixed week-index clamping crashing for dates outside the configured visible range.
 - Added the scope implementation and week tests to the Xcode project targets.
 - Fixed enclosing scroll views and pull-to-refresh controls stealing vertical calendar gestures.

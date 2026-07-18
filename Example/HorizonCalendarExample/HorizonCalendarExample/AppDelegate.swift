@@ -168,13 +168,17 @@ private struct ScopeTransitionSwiftUIRepresentable: UIViewRepresentable {
       setScope(completedScope)
       transitionCompleted(completedScope)
     }
+    guard !ProcessInfo.processInfo.arguments.contains("--scope-transition-no-debug") else {
+      calendarView.scopeTransitionDebugHandler = nil
+      return
+    }
     calendarView.scopeTransitionDebugHandler = { snapshot in
       let marker = ScopeTransitionLabTelemetry.shared.marker
       let markerY = marker.flatMap { marker in
         marker.window?.convert(marker.bounds, from: marker).minY
       }
       print(
-        "SCOPE_SWIFTUI_TRACE direction=\(snapshot.fromScope)_to_\(snapshot.toScope) phase=\(snapshot.phase.rawValue) elapsed=\(Self.format(snapshot.elapsedTime)) duration=\(Self.format(snapshot.duration)) containerModelH=\(Self.format(snapshot.containerBounds.height)) containerPresentationH=\(Self.format(snapshot.containerPresentationFrame.height)) matchedRowY=\(Self.format(snapshot.matchedRowPresentationFrame?.minY)) matchedRowH=\(Self.format(snapshot.matchedRowPresentationFrame?.height)) monthRowY=\(Self.format(snapshot.monthAnchorFrame.minY)) monthRowH=\(Self.format(snapshot.monthAnchorFrame.height)) weekRowY=\(Self.format(snapshot.weekAnchorFrame.minY)) weekRowH=\(Self.format(snapshot.weekAnchorFrame.height)) maskY=\(Self.format(snapshot.monthMaskPresentationFrame?.minY)) maskH=\(Self.format(snapshot.monthMaskPresentationFrame?.height)) belowGlobalY=\(Self.format(markerY))"
+        "SCOPE_SWIFTUI_TRACE direction=\(snapshot.fromScope)_to_\(snapshot.toScope) phase=\(snapshot.phase.rawValue) elapsed=\(Self.format(snapshot.elapsedTime)) duration=\(Self.format(snapshot.duration)) containerModelH=\(Self.format(snapshot.containerBounds.height)) containerPresentationH=\(Self.format(snapshot.containerPresentationFrame.height)) matchedRowY=\(Self.format(snapshot.matchedRowPresentationFrame?.minY)) matchedRowH=\(Self.format(snapshot.matchedRowPresentationFrame?.height)) monthRowY=\(Self.format(snapshot.monthAnchorFrame.minY)) monthRowH=\(Self.format(snapshot.monthAnchorFrame.height)) weekRowY=\(Self.format(snapshot.weekAnchorFrame.minY)) weekRowH=\(Self.format(snapshot.weekAnchorFrame.height)) clipY=\(Self.format(snapshot.monthMaskPresentationFrame?.minY)) clipH=\(Self.format(snapshot.monthMaskPresentationFrame?.height)) backdropY=\(Self.format(snapshot.transitionBackdropPresentationFrame?.minY)) backdropH=\(Self.format(snapshot.transitionBackdropPresentationFrame?.height)) belowGlobalY=\(Self.format(markerY))"
       )
     }
   }
@@ -456,7 +460,7 @@ private final class ScopeTransitionLabViewController: UIViewController {
     let detailsPresentationFrame = detailsLabel.layer.presentation()?.frame ?? detailsLabel.frame
     let direction = "\(snapshot.fromScope)_to_\(snapshot.toScope)"
     print(
-      "SCOPE_TRACE direction=\(direction) phase=\(snapshot.phase.rawValue) elapsed=\(format(snapshot.elapsedTime)) duration=\(format(snapshot.duration)) containerModelH=\(format(snapshot.containerBounds.height)) containerPresentationH=\(format(snapshot.containerPresentationFrame.height)) monthAnchorModelY=\(format(snapshot.monthAnchorFrame.midY)) monthAnchorPresentationY=\(format(snapshot.monthAnchorPresentationCenter.y)) weekAnchorY=\(format(snapshot.weekAnchorPresentationCenter.y)) maskModelY=\(format(snapshot.monthMaskFrame?.minY)) maskModelH=\(format(snapshot.monthMaskFrame?.height)) maskPresentationY=\(format(snapshot.monthMaskPresentationFrame?.minY)) maskPresentationH=\(format(snapshot.monthMaskPresentationFrame?.height)) detailsModelY=\(format(detailsLabel.frame.minY)) detailsPresentationY=\(format(detailsPresentationFrame.minY))"
+      "SCOPE_TRACE direction=\(direction) phase=\(snapshot.phase.rawValue) elapsed=\(format(snapshot.elapsedTime)) duration=\(format(snapshot.duration)) containerModelH=\(format(snapshot.containerBounds.height)) containerPresentationH=\(format(snapshot.containerPresentationFrame.height)) monthAnchorModelY=\(format(snapshot.monthAnchorFrame.midY)) monthAnchorPresentationY=\(format(snapshot.monthAnchorPresentationCenter.y)) weekAnchorY=\(format(snapshot.weekAnchorPresentationCenter.y)) clipModelY=\(format(snapshot.monthMaskFrame?.minY)) clipModelH=\(format(snapshot.monthMaskFrame?.height)) clipPresentationY=\(format(snapshot.monthMaskPresentationFrame?.minY)) clipPresentationH=\(format(snapshot.monthMaskPresentationFrame?.height)) backdropPresentationY=\(format(snapshot.transitionBackdropPresentationFrame?.minY)) backdropPresentationH=\(format(snapshot.transitionBackdropPresentationFrame?.height)) detailsModelY=\(format(detailsLabel.frame.minY)) detailsPresentationY=\(format(detailsPresentationFrame.minY))"
     )
   }
 

@@ -3,7 +3,8 @@ A declarative and performant calendar UI component that supports use cases rangi
 
 > [!NOTE]
 > This fork adds first-class month and week scopes through `CalendarScopeView`, including
-> matched-row selected-date transitions, horizontal week paging, vertical expand/collapse gestures, and
+> matched-row selected-date transitions with rigidly spaced surrounding rows, horizontal week paging,
+> vertical expand/collapse gestures, and
 > preferred-height callbacks. It remains based on and visibly linked to
 > [Airbnb's HorizonCalendar](https://github.com/airbnb/HorizonCalendar).
 
