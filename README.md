@@ -702,8 +702,9 @@ vertical gesture expands it again. Vertical gestures that begin inside the calen
 precedence over an enclosing scroll view, including pull-to-refresh. Set `isScopeGestureEnabled`
 to `false` if the containing application provides its own gesture or explicit Month/Week controls.
 
-Animated scope changes keep the weekday header stationary and move the anchored week's day views
-between their month and week positions, rather than cross-fading between two complete calendars.
+Animated scope changes keep the weekday header stationary and move the actual anchored month row
+into its week position. The surrounding rows are clipped by an animated mask; neither calendar
+renderer changes opacity during the transition.
 
 ### Responding to day selection
 If you're building a date picker, you'll most likely need to respond to the user tapping on days in the calendar.

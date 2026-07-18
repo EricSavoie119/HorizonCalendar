@@ -109,16 +109,19 @@ public final class CalendarView: UIView {
     return scrollView.convert(frame, to: self)
   }
 
-  func setAlpha(_ alpha: CGFloat, forVisibleDays days: Set<Day>) {
+  func setDayOfWeekItemsAlpha(_ alpha: CGFloat) {
     for (visibleItem, visibleView) in visibleViewsForVisibleItems {
-      guard
-        case .layoutItemType(.day(let day)) = visibleItem.itemType,
-        days.contains(day)
-      else {
-        continue
-      }
+      switch visibleItem.itemType {
+      case .layoutItemType(.dayOfWeekInMonth(_, _)),
+        .daysOfWeekRowSeparator(_),
+        .pinnedDayOfWeek(_),
+        .pinnedDaysOfWeekRowBackground,
+        .pinnedDaysOfWeekRowSeparator:
+        visibleView.alpha = alpha
 
-      visibleView.alpha = alpha
+      default:
+        break
+      }
     }
   }
 

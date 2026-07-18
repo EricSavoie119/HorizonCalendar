@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ability to disable `DisplayLink` animations for test purposes (to prevent crashes) with an environment variable.
 
 ### Fixed
-- Replaced the scope cross-fade with a matched day-row transition and kept weekday headers fixed
-  while changing scope.
+- Removed scope cross-fades so the actual month row translates and clips into week scope while
+  the weekday header remains fixed.
 - Fixed enclosing scroll views and pull-to-refresh controls stealing vertical calendar gestures.
 - Fixed an issue that could cause accessibility focus to shift unexpectedly
 - Fixed a screen-pixel alignment issue
