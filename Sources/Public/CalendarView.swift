@@ -110,17 +110,11 @@ public final class CalendarView: UIView {
   }
 
   func setDayOfWeekItemsAlpha(_ alpha: CGFloat) {
-    for (visibleItem, visibleView) in visibleViewsForVisibleItems {
-      switch visibleItem.itemType {
-      case .layoutItemType(.dayOfWeekInMonth(_, _)),
-        .daysOfWeekRowSeparator(_),
-        .pinnedDayOfWeek(_),
-        .pinnedDaysOfWeekRowBackground,
-        .pinnedDaysOfWeekRowSeparator:
-        visibleView.alpha = alpha
+    dayOfWeekItemsAlpha = alpha
 
-      default:
-        break
+    for (visibleItem, visibleView) in visibleViewsForVisibleItems {
+      if isDayOfWeekItem(visibleItem.itemType) {
+        visibleView.alpha = alpha
       }
     }
   }
@@ -535,6 +529,7 @@ public final class CalendarView: UIView {
   private var _visibleItemsProvider: VisibleItemsProvider?
   private var visibleItemsDetails: VisibleItemsDetails?
   private var visibleViewsForVisibleItems = [VisibleItem: ItemView]()
+  private var dayOfWeekItemsAlpha: CGFloat = 1
 
   private var isAnimatedUpdatePass = false
 
@@ -870,6 +865,9 @@ public final class CalendarView: UIView {
     view.calendarItemModel = calendarItemModel
     view.itemType = visibleItem.itemType
     view.frame = visibleItem.frame.alignedToPixels(forScreenWithScale: scale)
+    if isDayOfWeekItem(visibleItem.itemType) {
+      view.alpha = dayOfWeekItemsAlpha
+    }
 
     if traitCollection.layoutDirection == .rightToLeft {
       view.transform = .init(scaleX: -1, y: 1)
@@ -884,6 +882,20 @@ public final class CalendarView: UIView {
       }
     } else {
       view.selectionHandler = nil
+    }
+  }
+
+  private func isDayOfWeekItem(_ itemType: VisibleItem.ItemType) -> Bool {
+    switch itemType {
+    case .layoutItemType(.dayOfWeekInMonth(_, _)),
+      .daysOfWeekRowSeparator(_),
+      .pinnedDayOfWeek(_),
+      .pinnedDaysOfWeekRowBackground,
+      .pinnedDaysOfWeekRowSeparator:
+      return true
+
+    default:
+      return false
     }
   }
 

@@ -134,6 +134,57 @@ final class WeekDataTests: XCTestCase {
     XCTAssertEqual(metrics.frameForDay(at: 5).minX, 290.428_571, accuracy: 0.001)
   }
 
+  func testWeekdayHeaderRemainsVisibleAcrossSettledScopes() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let anchorDate = date(2026, 7, 19, calendar: calendar)
+    let content = CalendarViewContent(
+      calendar: calendar,
+      visibleDateRange: date(
+        2026, 1, 1, calendar: calendar)...date(2026, 12, 31, calendar: calendar),
+      monthsLayout: .horizontal
+    )
+    .interMonthSpacing(18)
+    .horizontalDayMargin(4)
+
+    let scopeView = CalendarScopeView(
+      initialContent: content,
+      initialScope: .month,
+      initialDate: anchorDate
+    )
+    scopeView.frame = CGRect(x: 0, y: 0, width: 408, height: 390)
+    scopeView.layoutIfNeeded()
+
+    guard
+      let weekView = scopeView.subviews.compactMap({ $0 as? WeekCalendarView }).first,
+      let collectionView = weekView.subviews.compactMap({ $0 as? UICollectionView }).first
+    else {
+      return XCTFail("Expected the scope view to contain its week renderer")
+    }
+
+    let weekdayViews = weekView.subviews.compactMap { $0 as? ItemView }
+    XCTAssertEqual(weekdayViews.count, 7)
+    XCTAssertTrue(weekdayViews.allSatisfy { !$0.isHidden && $0.alpha == 1 })
+    XCTAssertFalse(weekView.isHidden)
+    XCTAssertEqual(weekView.alpha, 1)
+    XCTAssertFalse(weekView.isUserInteractionEnabled)
+    XCTAssertEqual(collectionView.alpha, 0)
+
+    scopeView.setScope(.week, anchoredAt: anchorDate, animated: false)
+
+    XCTAssertTrue(weekdayViews.allSatisfy { !$0.isHidden && $0.alpha == 1 })
+    XCTAssertFalse(weekView.isHidden)
+    XCTAssertTrue(weekView.isUserInteractionEnabled)
+    XCTAssertEqual(collectionView.alpha, 1)
+
+    scopeView.setScope(.month, anchoredAt: anchorDate, animated: false)
+
+    XCTAssertTrue(weekdayViews.allSatisfy { !$0.isHidden && $0.alpha == 1 })
+    XCTAssertFalse(weekView.isHidden)
+    XCTAssertFalse(weekView.isUserInteractionEnabled)
+    XCTAssertEqual(collectionView.alpha, 0)
+  }
+
   private func date(
     _ year: Int,
     _ month: Int,
