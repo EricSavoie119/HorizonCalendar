@@ -185,6 +185,59 @@ final class WeekDataTests: XCTestCase {
     XCTAssertEqual(collectionView.alpha, 0)
   }
 
+  func testShortMonthContainerKeepsWeekdayHeaderAboveDates() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let anchorDate = date(2026, 7, 19, calendar: calendar)
+    let content = CalendarViewContent(
+      calendar: calendar,
+      visibleDateRange: date(
+        2026, 1, 1, calendar: calendar)...date(2026, 12, 31, calendar: calendar),
+      monthsLayout: .horizontal
+    )
+    .interMonthSpacing(18)
+    .horizontalDayMargin(4)
+    .verticalDayMargin(4)
+    .monthHeaderItemProvider { _ in
+      ColorViewRepresentable.calendarItemModel(
+        invariantViewProperties: .clear
+      )
+    }
+
+    let scopeView = CalendarScopeView(
+      initialContent: content,
+      initialScope: .month,
+      initialDate: anchorDate
+    )
+    scopeView.directionalLayoutMargins = .zero
+    scopeView.frame = CGRect(x: 0, y: 0, width: 345, height: 296)
+    scopeView.layoutIfNeeded()
+
+    guard
+      let monthView = scopeView.subviews.compactMap({ $0 as? CalendarView }).first,
+      let weekView = scopeView.subviews.compactMap({ $0 as? WeekCalendarView }).first
+    else {
+      return XCTFail("Expected both scope renderers")
+    }
+
+    let weekdayFrames = weekView.subviews
+      .compactMap { $0 as? ItemView }
+      .map { weekView.convert($0.frame, to: scopeView) }
+    let dayFrames = descendantItemViews(in: monthView).compactMap { itemView -> CGRect? in
+      guard case .layoutItemType(.day) = itemView.itemType else { return nil }
+      return itemView.superview?.convert(itemView.frame, to: scopeView)
+    }
+
+    guard let weekdayBottom = weekdayFrames.map(\.maxY).max(),
+          let firstDayTop = dayFrames.map(\.minY).min()
+    else {
+      return XCTFail("Expected visible weekday and day frames")
+    }
+
+    XCTAssertGreaterThan(monthView.frame.height, scopeView.bounds.height)
+    XCTAssertGreaterThanOrEqual(firstDayTop, weekdayBottom + content.verticalDayMargin - 0.001)
+  }
+
   private func date(
     _ year: Int,
     _ month: Int,
@@ -192,5 +245,11 @@ final class WeekDataTests: XCTestCase {
     calendar: Calendar
   ) -> Date {
     calendar.date(from: DateComponents(year: year, month: month, day: day))!
+  }
+
+  private func descendantItemViews(in view: UIView) -> [ItemView] {
+    view.subviews.flatMap { subview in
+      (subview as? ItemView).map { [$0] } ?? descendantItemViews(in: subview)
+    }
   }
 }
