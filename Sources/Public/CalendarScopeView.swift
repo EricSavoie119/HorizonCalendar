@@ -47,6 +47,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     clipsToBounds = true
     addSubview(monthCalendarView)
     addSubview(weekCalendarView)
+    monthCalendarView.setDayOfWeekItemsAlpha(0)
 
     monthCalendarView.daySelectionHandler = { [weak self] day in
       self?.handleDaySelection(day)
@@ -383,12 +384,17 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   }
 
   private func configureVisibility(for scope: CalendarViewScope) {
+    monthCalendarView.setDayOfWeekItemsAlpha(0)
     monthCalendarView.alpha = scope == .month ? 1 : 0
     monthCalendarView.isHidden = scope != .month
     monthCalendarView.transform = .identity
 
-    weekCalendarView.alpha = scope == .week ? 1 : 0
-    weekCalendarView.isHidden = scope != .week
+    // The week renderer owns the one shared weekday header in both scopes. In month scope, only its
+    // date content is hidden and interaction passes through to the month renderer below it.
+    weekCalendarView.alpha = 1
+    weekCalendarView.isHidden = false
+    weekCalendarView.isUserInteractionEnabled = scope == .week
+    weekCalendarView.setDayContentAlpha(scope == .week ? 1 : 0)
     weekCalendarView.transform = .identity
   }
 
@@ -435,8 +441,8 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
     monthCalendarView.transform = .identity
     weekCalendarView.transform = .identity
 
-    // Keep the shared weekday labels stationary in the live week renderer. The month backdrop is
-    // captured without them, so they never cross-fade or spring between two copies.
+    // Keep the permanent weekday labels stationary in the live week renderer. The month backdrop
+    // is captured without its duplicate labels.
     monthCalendarView.setDayOfWeekItemsAlpha(0)
     weekCalendarView.setDayContentAlpha(1)
 
@@ -446,7 +452,6 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
         ? monthCalendarView.snapshotImage(in: monthRowFrame)
         : weekCalendarView.snapshotImage(in: weekRowFrame))
     else {
-      monthCalendarView.setDayOfWeekItemsAlpha(1)
       transitionMonthHeight = nil
       configureVisibility(for: newScope)
       scopeChangeHandler?(newScope)
@@ -524,8 +529,6 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
       self.transitionClipView = nil
       self.transitionDebugBackdropView = nil
       self.transitionDebugMatchedRowView = nil
-      self.monthCalendarView.setDayOfWeekItemsAlpha(1)
-      self.weekCalendarView.setDayContentAlpha(1)
       self.transitionMonthHeight = nil
       self.configureVisibility(for: newScope)
       self.setNeedsLayout()

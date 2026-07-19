@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ability to disable `DisplayLink` animations for test purposes (to prevent crashes) with an environment variable.
 
 ### Fixed
+- Kept the weekday header visible at a fixed position in both scopes, preventing it from appearing
+  or disappearing at the start of month-to-week and week-to-month transitions.
 - Fixed week scope using the full calendar width instead of the centered horizontal month-page width,
   which caused day columns to widen during scope transitions.
 - Replaced scope cross-fades and renderer swaps with an exact matched-row transition that moves and
