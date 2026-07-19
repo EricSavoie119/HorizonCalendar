@@ -150,11 +150,14 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
 
   public override func layoutSubviews() {
     super.layoutSubviews()
+    let intrinsicMonthHeight = monthLayoutHeight(forWidth: bounds.width)
+    let monthHeight = transitionMonthHeight
+      ?? (intrinsicMonthHeight > 0 ? intrinsicMonthHeight : bounds.height)
     monthCalendarView.frame = CGRect(
       x: bounds.minX,
       y: bounds.minY,
       width: bounds.width,
-      height: transitionMonthHeight ?? bounds.height
+      height: monthHeight
     )
     weekCalendarView.frame = bounds
 
@@ -174,6 +177,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   /// Updates the content in both month and week scopes.
   public func setContent(_ content: CalendarViewContent, animated: Bool = false) {
     self.content = content
+    cachedMonthLayoutHeight = nil
     monthCalendarView.setContent(content, animated: animated)
     weekCalendarView.setContent(content)
     scrollScopes(toAnchorDate: anchorDate, animated: false)
@@ -263,6 +267,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   private let weekCalendarView: WeekCalendarView
   private weak var enclosingScrollView: UIScrollView?
   private var transitionMonthHeight: CGFloat?
+  private var cachedMonthLayoutHeight: (width: CGFloat, height: CGFloat)?
   private var transitionDebugContext: TransitionDebugContext?
   private var transitionDebugDisplayLink: CADisplayLink?
   private weak var transitionClipView: UIView?
@@ -313,6 +318,7 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
   }
 
   private func synchronizeLayoutMargins() {
+    cachedMonthLayoutHeight = nil
     monthCalendarView.layoutMargins = layoutMargins
     weekCalendarView.layoutMargins = layoutMargins
     setNeedsLayout()
@@ -339,15 +345,25 @@ public final class CalendarScopeView: UIView, UIGestureRecognizerDelegate {
 
     switch scope {
     case .month:
-      let horizontallyInsetWidth = max(width - layoutMargins.left - layoutMargins.right, 0)
-      return
-        monthCalendarView
-        .intrinsicContentSize(forHorizontallyInsetWidth: horizontallyInsetWidth)
-        .height
+      return monthLayoutHeight(forWidth: width)
 
     case .week:
       return weekCalendarView.preferredHeight(forWidth: width)
     }
+  }
+
+  private func monthLayoutHeight(forWidth width: CGFloat) -> CGFloat {
+    guard width > 0 else { return UIView.noIntrinsicMetric }
+    if let cachedMonthLayoutHeight, cachedMonthLayoutHeight.width == width {
+      return cachedMonthLayoutHeight.height
+    }
+
+    let horizontallyInsetWidth = max(width - layoutMargins.left - layoutMargins.right, 0)
+    let height = monthCalendarView
+      .intrinsicContentSize(forHorizontallyInsetWidth: horizontallyInsetWidth)
+      .height
+    cachedMonthLayoutHeight = (width, height)
+    return height
   }
 
   private func prepareTargetScope(_ scope: CalendarViewScope, anchorDate: Date) {
